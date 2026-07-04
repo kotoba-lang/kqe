@@ -11,12 +11,12 @@
   fixpoint/SPARQL BGP evaluation are explicitly NOT in this landing --
   tracked as follow-ups, not silently omitted.
 
-  `query`'s optional `visible?` is the query-time visibility seam
-  (ADR-2607050500, \"Query as first-class effect\"): kqe stays auth-agnostic
-  by design (no purpose/scope/capability opinion lives here), but a
-  composing layer can inject a predicate to redact quads a given principal
-  may not see. Default is permissive (every quad visible) -- fully
-  backward compatible with every existing caller."
+  `query`'s `visible?` is REQUIRED (ADR-2607050500: \"Query as first-class
+  effect\" -- not a bare read). kqe stays auth-agnostic by design (no
+  purpose/scope/capability opinion lives here), but it refuses to run a
+  query without the caller stating a visibility decision; there is no
+  permissive default to fall back on silently. Pass `(constantly true)`
+  to see everything -- that is a caller's explicit choice, not kqe's."
   (:require [quad-store.core :as qs]))
 
 (defn- query* [db [s p o]]
@@ -39,10 +39,8 @@
     (into #{} (for [[s2 pm] (:spo db) [p2 os] pm o2 os] {:s s2 :p p2 :o o2}))))
 
 (defn query
-  "`pattern` is `[s p o]`, any position `nil` for wildcard. Returns a set of
-  matching `{:s :p :o}` quads. `visible?` (default: every quad visible) is
-  applied as a post-filter over every candidate quad before it's returned --
-  see the ns docstring."
-  ([db pattern] (query db pattern (constantly true)))
-  ([db pattern visible?]
-   (into #{} (filter visible? (query* db pattern)))))
+  "`pattern` is `[s p o]`, any position `nil` for wildcard. `visible?` is
+  applied as a post-filter over every candidate quad before it's returned
+  -- see the ns docstring. Returns a set of matching `{:s :p :o}` quads."
+  [db pattern visible?]
+  (into #{} (filter visible? (query* db pattern))))
