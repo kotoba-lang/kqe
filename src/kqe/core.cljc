@@ -9,13 +9,17 @@
   Only the hot (in-memory) `quad-store.core` db is queried here. Cold
   (prolly-tree-backed, post-`commit!`) query and full Datalog
   fixpoint/SPARQL BGP evaluation are explicitly NOT in this landing --
-  tracked as follow-ups, not silently omitted."
+  tracked as follow-ups, not silently omitted.
+
+  `query`'s optional `visible?` is the query-time visibility seam
+  (ADR-2607050500, \"Query as first-class effect\"): kqe stays auth-agnostic
+  by design (no purpose/scope/capability opinion lives here), but a
+  composing layer can inject a predicate to redact quads a given principal
+  may not see. Default is permissive (every quad visible) -- fully
+  backward compatible with every existing caller."
   (:require [quad-store.core :as qs]))
 
-(defn query
-  "`pattern` is `[s p o]`, any position `nil` for wildcard. Returns a set of
-  matching `{:s :p :o}` quads."
-  [db [s p o]]
+(defn- query* [db [s p o]]
   (cond
     (some? s)
     (into #{}
@@ -33,3 +37,12 @@
 
     :else
     (into #{} (for [[s2 pm] (:spo db) [p2 os] pm o2 os] {:s s2 :p p2 :o o2}))))
+
+(defn query
+  "`pattern` is `[s p o]`, any position `nil` for wildcard. Returns a set of
+  matching `{:s :p :o}` quads. `visible?` (default: every quad visible) is
+  applied as a post-filter over every candidate quad before it's returned --
+  see the ns docstring."
+  ([db pattern] (query db pattern (constantly true)))
+  ([db pattern visible?]
+   (into #{} (filter visible? (query* db pattern)))))
