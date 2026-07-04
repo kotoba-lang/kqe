@@ -9,7 +9,7 @@ same change — Datomic's own term for the 4-covering-index structure it
 stores).
 
 A pure routing function with no storage of its own didn't need a
-separate repo. See ADR-2607050600.
+separate repo. See ADR-2607050700.
 
 No further commits will land here. Zero other repos in the org depended
 on this one directly (only `kotoba-lang/kotobase-peer`, formerly
