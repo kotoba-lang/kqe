@@ -34,3 +34,26 @@
   (let [db (fixture-db)]
     (testing "unbound query returns every quad"
       (is (= 4 (count (kqe/query db [nil nil nil])))))))
+
+;; ── query-time visibility seam (ADR-2607050500) ─────────────────────────────
+
+(deftest visible-defaults-to-permissive
+  (let [db (fixture-db)]
+    (is (= (kqe/query db [nil "role" nil])
+           (kqe/query db [nil "role" nil] (constantly true)))
+        "omitting visible? behaves identically to a permissive predicate")))
+
+(deftest visible-redacts-without-kqe-knowing-why
+  (let [db (fixture-db)
+        admins-only? (fn [{:keys [s]}] (not= "bob" s))]
+    (testing "a composing layer can hide specific quads from a result"
+      (is (= #{{:s "alice" :p "role" :o "admin"} {:s "carol" :p "role" :o "admin"}}
+             (kqe/query db [nil "role" nil] admins-only?))))
+    (testing "visible? applies uniformly across every routing branch"
+      (is (= #{{:s "alice" :p "role" :o "admin"} {:s "alice" :p "name" :o "Alice"}}
+             (kqe/query db ["alice" nil nil] admins-only?)))
+      (is (= #{{:s "carol" :p "role" :o "admin"}}
+             (kqe/query db [nil "role" "admin"] (fn [{:keys [s]}] (= s "carol")))))
+      (is (= 3 (count (kqe/query db [nil nil nil] admins-only?)))))
+    (testing "an always-false visible? redacts everything"
+      (is (= #{} (kqe/query db [nil nil nil] (constantly false)))))))
